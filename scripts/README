@@ -1,0 +1,9 @@
+analyse.py             analyse generated C5 PSV and RPI data
+calc-dirs-and-rpi.py   generate C5 PSV and RPI data from magnetometer files
+clgplot.py             library for IRM CLG plotting (used by plot_irm)
+curveread.py           read PSV/RPI data from C5 and reference sources
+day_plot.py            create a Day plot from specified data
+day_plot_c5.py         create a Day plot from C5 data
+plot_irm.py            create IRM CLG plots
+plot_settings.py       configure some matplotlib settings (used by plot_irm)
+tglc.py                library for reading/processing 2G magnetometer data
