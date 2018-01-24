@@ -28,7 +28,12 @@ freely available) must be installed.
 * Match ( http://www.lorraine-lisiecki.com/match.html ), version 2.3.1
 
 The analysis scripts also make use of the PuffinPlot program (
-https://puffinplot.bitbucket.io/ ). For convenience, a pre-built archive
-of the appropriate version is included in the libraries directory; it
-was produced from commit a08a863 (2018-01-24) in the PuffinPlot
-repository.
+https://puffinplot.bitbucket.io/ ). A pre-built archive of the
+appropriate version is included in the libraries directory; it was
+produced from commit a08a863 (2018-01-24) in the PuffinPlot repository.
+
+For convenience, the main results of the paper (the dated inclination
+and RPI data from the C5 core) are checked in to the repository in the
+script-output directory, so they can be used directly without being
+regenerated from scratch. Generated palaeomagnetic data indexed by core
+depth are also provided, in the data/processed directory.
