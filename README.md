@@ -1,7 +1,6 @@
 This repository contains material associated with the paper ‘A
 4,500-year record of paleosecular variation and relative paleointensity
-from the Tyrrhenian Sea’, submitted for publication in *Journal of
-Geophysical Research – Solid Earth* by Lurcock et al. in 2018.
+from the Tyrrhenian Sea’, by Lurcock et al.
 
 The repository contains the code and data used to produce the results
 described in the paper. The contents are as follows.
@@ -28,12 +27,12 @@ freely available) must be installed.
 * Match ( http://www.lorraine-lisiecki.com/match.html ), version 2.3.1
 
 The analysis scripts also make use of the PuffinPlot program (
-https://puffinplot.bitbucket.io/ ). A pre-built archive of the
+https://talvi.net/puffinplot/ ). A pre-built archive of the
 appropriate version is included in the libraries directory; it was
-produced from commit a08a863 (2018-01-24) in the PuffinPlot repository.
+produced from commit 52cd1c495ac0 in the PuffinPlot repository.
 
-For convenience, the main results of the paper (the dated inclination
-and RPI data from the C5 core) are checked in to the repository in the
-script-output directory, so they can be used directly without being
-regenerated from scratch. Generated palaeomagnetic data indexed by core
-depth are also provided, in the data/processed directory.
+For convenience, the main results of the paper (the dated PSV and RPI data
+from the C5 core) are checked in to the repository in the script-output
+directory, so they can be used directly without being regenerated from
+scratch. Generated palaeomagnetic data indexed by core depth are also
+provided, in the data/processed directory.
