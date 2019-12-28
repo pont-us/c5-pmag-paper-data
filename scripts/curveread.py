@@ -14,25 +14,26 @@ fetches a PSV and/or RPI dataset specified by name and returns it as a Dataset
 object, optionally relocating any PSV data to a provided Location.
 """
 
-import os
-import zipfile
-import urllib
-import shutil
-import pexpect
-import subprocess
-import scipy.stats.mstats
-import numpy as np
-from scoter.series import Series
-import logging
-import inspect
 import hashlib
-import tarfile
+import inspect
+import logging
+import numpy as np
+import os
+import pexpect
 import re
-from math import degrees, radians, sin, cos, tan, asin, atan, atan2, pi
+import scipy.stats.mstats
+import shutil
+import subprocess
+import tarfile
+import urllib
+import zipfile
+from math import degrees, radians, sin, cos, tan, asin, atan, atan2, pi, sqrt
+
+from scoter.series import Series
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 PARENT_DIR = os.path.dirname(os.path.normpath(BASE_DIR))
-PRESENT_YEAR = 1950 # standardize on BP ages
+PRESENT_YEAR = 1950  # standardize on BP ages
 logger = logging.getLogger(__name__)
 
 
@@ -142,28 +143,54 @@ class Location(object):
     
         return new_decs, new_incs
 
+    def distance_km(self, other):
+        phi1 = self.lat_rads()
+        phi2 = other.lat_rads()
+        dlambda = abs(self.long_rads() - other.long_rads())
+        part1 = (cos(phi2) * sin(dlambda))**2
+        part2 = (cos(phi1)*sin(phi2) - sin(phi1)*cos(phi2)*cos(dlambda))**2
+        part3 = sin(phi1)*sin(phi2) + cos(phi1)*cos(phi2)*cos(dlambda)
+        dsigma = atan2(sqrt(part1+part2), part3)
+        earth_radius_km = 6371
+        return earth_radius_km * dsigma
+
 
 class Dataset(object):
     
     def __init__(self, name, xs, decs=None, incs=None, rpis=None,
-                 named_data={}, data_to_normalize=[]):
+                 named_data=None, data_to_normalize=None):
+        self.data_to_normalize = [] \
+            if data_to_normalize is None else data_to_normalize
+        self.extras = {} \
+            if named_data is None else named_data
         self.name = name
         self.xs = xs
         self.decs = decs
         self.incs = incs
         self.rpis_raw = rpis
-        self.extras = {}
-        for key in named_data:
-            values = np.array(named_data[key])
-            if key in data_to_normalize:
-                self.extras[key] = Dataset.zscores(values)
+        self.rpis = None
+
+    def normalize(self):
+        for key in self.extras:
+            values = np.array(self.extras[key])
+            if key in self.data_to_normalize:
+                self.extras[key] = Dataset.zscores_ignoring_outliers(values, 2)
             else:
                 self.extras[key] = values
 
-        if rpis is None:
-            self.rpis = None
-        else:
-            self.rpis = Dataset.zscores(rpis)
+        self.rpis = None if self.rpis_raw is None else \
+            Dataset.zscores_ignoring_outliers(self.rpis_raw, 2)
+
+    def truncate(self, max_x):
+        max_index = np.argmax(self.xs > max_x)
+        if max_index == 0:
+            return
+        for attribute in "xs", "decs", "incs", "rpis_raw", "rpis":
+            value = getattr(self, attribute)
+            if value is not None:
+                setattr(self, attribute, value[:max_index])
+        for key in self.extras:
+            self.extras[key] = self.extras[key][:max_index]
 
     @staticmethod
     def zscores(values):
@@ -171,6 +198,18 @@ class Dataset(object):
         values_copy[~np.isnan(values)] = \
             scipy.stats.mstats.zscore(values[~np.isnan(values)])
         return values_copy
+
+    @staticmethod
+    def zscores_ignoring_outliers(data, n_stdevs=2):
+        data_without_outliers = \
+            data[abs(data - np.mean(data)) < n_stdevs * np.std(data)]
+        mean = np.mean(data_without_outliers)
+        stdev = np.std(data_without_outliers)
+        def zscorify(x): return (x - mean) / stdev
+        data_copy = data.copy()
+        data_copy[~np.isnan(data)] = \
+            zscorify(data[~np.isnan(data)])
+        return data_copy
 
     def flip(self):
         self.xs = self.xs[::-1]
@@ -187,6 +226,9 @@ class Dataset(object):
 
     def inc_series(self, name):
         return Series(np.array([self.xs, self.incs]), name=name)
+
+    def dec_series(self, name):
+        return Series(np.array([self.xs, self.decs]), name=name)
 
     def rpi_series(self, name):
         return Series(np.array([self.xs, self.rpis]), name=name)
@@ -312,7 +354,7 @@ def read_cals(model_name, location):
                                cwd=model_dir,
                                timeout=2)
 
-        # CALS sliently truncates the output filename to 15 characters,
+        # CALS silently truncates the output filename to 15 characters,
         # so we give a short generic name here, then rename it
         # afterwards using the "proper" name with a lat/long suffix.
 
@@ -403,7 +445,7 @@ def read_augusta(curve_name, location):
             location, data[1], data[2])
         data[1] = decs
         data[2] = incs
-    d = Dataset("Augusta Bay", data[0], data[1], data[2], data[3])
+    d = Dataset("Augusta", data[0], data[1], data[2], data[3])
     return d
 
 
@@ -522,8 +564,10 @@ def read_bulg2014():
 def read_salerno_incs():
     # Digitized from Iorio et al. (2014) fig. 9, core C1201
     # doi:10.1016/j.gloplacha.2013.11.005
-    # Inclination and RPI records don't share the same age co-ordinates,
-    # which is why we have to put them in different Dataset objects.
+
+    # Inclination, declination, and RPI records don't share the same age
+    # co-ordinates, which is why we have to put them in different Dataset
+    # objects.
 
     filename_incs = refdata_path("salerno", "inc.tsv")
     data_incs = np.genfromtxt(filename_incs, delimiter="\t",
@@ -531,13 +575,27 @@ def read_salerno_incs():
     return Dataset("Salerno", data_incs[0]*1000, None, data_incs[1], None)
 
 
+def read_salerno_decs():
+    # Digitized from Iorio et al. (2014) fig. 9, core C1201
+    # doi:10.1016/j.gloplacha.2013.11.005
+    # Inclination, declination, and RPI records don't share the same age
+    # co-ordinates, which is why we have to put them in different Dataset
+    # objects.
+
+    filename_decs = refdata_path("salerno", "dec.tsv")
+    data_decs = np.genfromtxt(filename_decs, delimiter="\t",
+                              skip_header=1).swapaxes(0, 1)
+    return Dataset("Salerno", data_decs[0]*1000, data_decs[1], None, None)
+
+
 def read_salerno_rpis():
     # Digitized from Iorio et al. (2014) fig. 10, core C1201
     # doi:10.1016/j.gloplacha.2013.11.005
-    # Inclination and RPI records don't share the same age co-ordinates,
-    # which is why we have to put them in different Dataset objects.
+    # Inclination, declination, and RPI records don't share the same age
+    # co-ordinates, which is why we have to put them in different Dataset
+    # objects.
 
-    filename_rpis = refdata_path("salerno", "inc.tsv")
+    filename_rpis = refdata_path("salerno", "rpi.tsv")
     data_rpis = np.genfromtxt(filename_rpis, delimiter="\t",
                               skip_header=1).swapaxes(0, 1)
     return Dataset("Salerno", data_rpis[0]*1000, None, None, data_rpis[1])
@@ -658,26 +716,62 @@ def read_pfm9k_source(curve_name, location):
             year = int(parts[0])
             declination = float(parts[5])
             inclination = float(parts[7])
-            if inclination != -999:
+            if inclination != -999 and declination != -999:
                 ages.append(PRESENT_YEAR - year)
                 decs.append(declination)
                 incs.append(inclination)
 
     if location is not None:
         decs, incs = source_location.relocate_by_cvp(location, decs, incs)
-    d = Dataset(curve_name, ages, decs, incs)
+
+    dataset_names = dict(ty1="ET91-18", ty2="ET95-4")
+    dataset_name =\
+        dataset_names[curve_name] if curve_name in dataset_names else curve_name
+    
+    d = Dataset(dataset_name, ages, decs, incs)
     d.flip()
     return d
 
 
+def read_w_europe(name, location):
+
+    # Location (Paris) specified in the papers
+    paris = Location(48.9, 2.3)
+
+    data_dir = refdata_path(name)
+
+    data1 = np.genfromtxt(os.path.join(data_dir, "950BCE-50BCE.txt"),
+                          delimiter=" ",
+                          skip_header=3)
+    years1, decs1, incs1 = -data1[:, 0], data1[:, 5], data1[:, 4]
+
+    data2 = np.genfromtxt(os.path.join(data_dir, "100BCE-1800CE.txt"),
+                          delimiter=" ",
+                          skip_header=3)
+    data2_skip = 3  # skip rows which overlap with data1
+    years2, decs2, incs2 =\
+        data2[data2_skip:, 0], data2[data2_skip:, 5], data2[data2_skip:, 4]
+
+    years, decs, incs =\
+        np.append(years1, years2),\
+        np.append(decs1, decs2),\
+        np.append(incs1, incs2)
+
+    # Relocate data if required
+    if location is not None:
+        decs, incs = paris.relocate_by_cvp(location, decs, incs)
+
+    return Dataset("W. Europe", PRESENT_YEAR - years, decs, incs, None)
+
+
 def read_c5():
-    # Read inclinations and MAD3s
-    inc_file = data_path("processed", "incs-from-script.csv")
-    inc_data = np.genfromtxt(inc_file,
+    # Read declination, inclination, and MAD3s
+    psv_file = data_path("processed", "psv-from-script.csv")
+    psv_data = np.genfromtxt(psv_file,
                              delimiter=",",
                              skip_header=1).swapaxes(0, 1)
-    logger.info("C5 mean inc. %f" % np.mean(inc_data[6][20:]))
-    depths_inc = set(inc_data[1])
+    logger.info("C5 mean inc. %f" % np.mean(psv_data[6][20:]))
+    depths_inc = set(psv_data[1])
 
     # Read ARM-normalized RPIs
     rpi_arm_file = data_path("processed", "rpi-arm-optimized.csv")
@@ -686,6 +780,13 @@ def read_c5():
                                  skip_header=1).swapaxes(0, 1)
     depths_rpi_arm = set(rpi_arm_data[0])
 
+    # Read IRM-normalized RPIs
+    rpi_irm_file = data_path("processed", "rpi-irm-optimized.csv")
+    rpi_irm_data = np.genfromtxt(rpi_irm_file,
+                                 delimiter=",",
+                                 skip_header=1).swapaxes(0, 1)
+    depths_rpi_irm = set(rpi_irm_data[0])
+
     # Read MS-normalized RPIs
     rpi_ms_file = data_path("processed", "rpi-ms.csv")
     rpi_ms_data = np.genfromtxt(rpi_ms_file,
@@ -693,37 +794,78 @@ def read_c5():
                                 skip_header=1).swapaxes(0, 1)
     depths_rpi_ms = set(rpi_ms_data[0])
 
-    depths = depths_inc.intersection(depths_rpi_arm, depths_rpi_ms)
+    depths = depths_inc.intersection(depths_rpi_arm, depths_rpi_ms,
+                                     depths_rpi_irm)
 
     # 1 depth 6 inc 8 mad3
-    incs, mad3s = [], []
+    decs, incs, mad3s = [], [], []
     for i in range(len(depths_inc)):
-        if inc_data[1][i] in depths:
-            incs.append(inc_data[6][i])
-            mad3s.append(inc_data[8][i])
+        if psv_data[1][i] in depths:
+            incs.append(psv_data[6][i])
+            decs.append(psv_data[5][i])
+            mad3s.append(psv_data[8][i])
 
-    rpis_ratio, rpis_slope, rsquareds = [], [], []
+    rpis_arm_ratio, rpis_arm_slope, rpis_arm_rsquared = [], [], []
     # 0 depth 10 mean ratio 11 slope
     for i in range(len(depths_rpi_arm)):
         if rpi_arm_data[0][i] in depths:
-            rpis_ratio.append(rpi_arm_data[10][i])
-            rpis_slope.append(rpi_arm_data[11][i])
-            rsquareds.append(rpi_arm_data[13][i])
+            rpis_arm_ratio.append(rpi_arm_data[10][i])
+            rpis_arm_slope.append(rpi_arm_data[11][i])
+            rpis_arm_rsquared.append(rpi_arm_data[13][i])
+
+    rpis_irm_ratio, rpis_irm_slope, rpis_irm_rsquared = [], [], []
+    # 0 depth 10 mean ratio 11 slope
+    for i in range(len(depths_rpi_irm)):
+        if rpi_irm_data[0][i] in depths:
+            rpis_irm_ratio.append(rpi_irm_data[10][i])
+            rpis_irm_slope.append(rpi_irm_data[11][i])
+            rpis_irm_rsquared.append(rpi_irm_data[13][i])
 
     rpis_ms = []
     for i in range(len(depths_rpi_ms)):
         if rpi_ms_data[0][i] in depths:
-            rpis_ms.append(rpi_ms_data[2][i])
+            rpis_ms.append(rpi_ms_data[1][i])
 
-    return Dataset("C5 core", np.array(sorted(list(depths))),
-                   None, np.array(incs), np.array(rpis_ms),
-                   named_data={"mad3": np.array(mad3s),
-                               "rpi-arm-ratio": rpis_ratio,
-                               "rpi-arm-slope": rpis_slope,
-                               "rpi-rsquared": rsquareds,
-                               "rpi-ms": rpis_ms
-                               },
-                   data_to_normalize=["rpi-arm-ratio", "rpi-arm-slope"])
+    dataset = Dataset("C5 core", np.array(sorted(list(depths))),
+                      np.array(decs), np.array(incs), np.array(rpis_ms),
+                      named_data={"mad3": np.array(mad3s),
+                                  "rpi-arm-ratio": rpis_arm_ratio,
+                                  "rpi-arm-slope": rpis_arm_slope,
+                                  "rpi-arm-rsquared": rpis_arm_rsquared,
+                                  "rpi-irm-ratio": rpis_irm_ratio,
+                                  "rpi-irm-slope": rpis_irm_slope,
+                                  "rpi-irm-rsquared": rpis_irm_rsquared,
+                                  "rpi-ms": rpis_ms
+                                  },
+                      data_to_normalize=["rpi-arm-ratio", "rpi-arm-slope",
+                                         "rpi-irm-ratio", "rpi-irm-slope",
+                                         "rpi-ms"])
+
+    # NB median RPI created seperately
+
+    return dataset
+
+
+def create_c5_median_rpi(dataset):
+
+    # We have to add the median RPI data after normalizing the RPI
+    # values, because we want the mean of the *normalized* values, and
+    # normalization is done in the constructor.
+
+    rpis_median = []
+    for i in range(len(dataset.xs)):
+        all_estimates = \
+            [dataset.get_named_data(estimate)[i] for estimate in
+             ("rpi-arm-ratio",
+              "rpi-arm-slope",
+              "rpi-irm-ratio",
+              "rpi-irm-slope",
+              "rpi-ms")]
+        median = np.median(all_estimates)
+        rpis_median.append(median)
+    dataset.extras["rpi-median"] = np.array(rpis_median)
+    dataset.rpis = dataset.extras["rpi-median"]
+
 
 
 def read_c5_rpi_ms():
@@ -748,6 +890,7 @@ dispatch_table = {
     "bulg1998": read_bulg1998,
     "bulg2014": read_bulg2014,
     "salerno_incs": read_salerno_incs,
+    "salerno_decs": read_salerno_decs,
     "salerno_rpis": read_salerno_rpis,
     "piso": read_piso,
     "u1308": read_u1308,
@@ -756,16 +899,23 @@ dispatch_table = {
     "augusta": read_augusta,
     "igrf_12": read_igrf12,
     "ty1": read_pfm9k_source,
-    "ty2": read_pfm9k_source
+    "ty2": read_pfm9k_source,
+    "w-europe": read_w_europe
 }
 
 
-def read_dataset(key, location):
+def read_dataset(key, location, max_x=None):
     fn = dispatch_table[key]
     nargs = len(inspect.getargspec(fn).args)
     if nargs == 0:
-        return fn()
+        dataset = fn()
     elif nargs == 2:
-        return fn(key, location)
+        dataset = fn(key, location)
     else:
         raise ValueError("Invalid number of parameters for "+fn.func_name)
+    if max_x is not None:
+        dataset.truncate(max_x)
+    dataset.normalize()
+    if key == "c5":
+        create_c5_median_rpi(dataset)
+    return dataset

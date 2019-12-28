@@ -340,6 +340,28 @@ class Series(object):
         new_data[1] = values_offs_scale
         return self.copy(data=new_data, suffix="-sc")
 
+    def scale_extrema_to(self, series):
+        """Scale values in this series to match the extrema of another series.
+
+        Scale the values of this series linearly in such a way that the
+        minimum and maximum values are the same as the minimum and maximum
+        values of another series.
+
+        :param series: the series from which to take the minimum and maximum
+        :return: a copy of this series, with the values scaled to the
+           minimum and maximum of ``series``.
+        """
+        min_this = min(self.values())
+        max_this = max(self.values())
+        min_other = min(series.values())
+        max_other = max(series.values())
+        scale = (max_other - min_other) / (max_this - min_this)
+        offset = min_other - scale * min_this
+        new_values = scale * self.values() + offset
+        new_data = self.data.copy()
+        new_data[1] = new_values
+        return self.copy(data=new_data, suffix="-sc")
+
     def scale_positions_by(self, factor):
         """Return this series, with the positions linearly scaled by the
         supplied factor.
@@ -361,6 +383,14 @@ class Series(object):
         new_data = self.data.copy()
         new_data[1] = values_offset_scaled + mean
         return self.copy(data=new_data, suffix="-sc")
+
+    def scale_values_without_offset(self, factor):
+        """Return this series, with the values linearly scaled by the
+        supplied factor."""
+        new_data = self.data.copy()
+        new_data[1] = self.data[1] * factor
+
+        return self.copy(new_data, suffix="-sc")
 
     def scale_to_other_series(self, target_series, reference_range):
         """Return this series, scaled to match another series.
@@ -653,3 +683,51 @@ class Series(object):
                                                specifier_type))
 
         return Series(np.array([xs, ys]))
+
+    def linear_position_transform(self, tie_points):
+        """Linearly transform the positions of this series.
+
+        In practice, this method can be used to transform a depth series
+        to a time series. The position transformation is defined by a
+        supplied list of time points mapping a position in the old system
+        (e.g. depth) to a position in the new system (e.g. time). The values
+        remain the same, but the positions are mapped linearly from the old
+        system to the new system.
+
+        :param tie_points: a list of (p1, p2) pairs, where p1 is a position
+               in this series’ system and p2 is a position in the system
+               of the series to be produced
+        :return: a new series with the same values as this one, but with
+                the positions linearly mapped to the new system
+        """
+
+        xs_old = self.data[0]
+        tie_points_flipped = zip(*tie_points)
+        transform_xs = tie_points_flipped[0]
+        transform_ys = tie_points_flipped[1]
+
+        f = interp1d(transform_xs, transform_ys, fill_value="extrapolate")
+        # xs_new = np.interp(xs_old, transform_xs, transform_ys)
+        xs_new = f(xs_old)
+
+        return self.copy(data=np.array([xs_new, self.data[1]]))
+
+    def wrap_values(self, maximum=180, period=360):
+        """Wrap values into a periodic range.
+
+        This method is intended for declinations and other periodic values.
+        For each value in the series, it will subtract enough multiples of
+        the period to bring the value under the maximum (in effect, a modulo
+        function with an offset). The method returns a new series.
+
+        :param maximum: the maximum value to allow in the new series
+        :param period: the period of the values
+        :return: a new series with the values wrapped into the specified period
+        """
+        def wrapper(value):
+            while value > maximum:
+                value -= period
+            return value
+
+        v_wrapper = np.vectorize(wrapper)
+        return self.copy(data=np.array([self.data[0], v_wrapper(self.data[1])]))

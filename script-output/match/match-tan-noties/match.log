@@ -1,0 +1,63 @@
+Match 2.0 (Lisiecki and Lisiecki, 2002) 
+
+---Configuration---
+nomatch 10
+speedchange 5.5
+speedpenalty 0
+gappenalty 1
+gapsizemultiplier 11.5864
+tiepenalty 0.065
+reversetiepenalty 0
+begin1 52
+end1 434
+numintervals1 200
+begin2 44
+end2 4470
+numintervals2 200
+normbegin1 NaN
+normbegin2 NaN
+normend1 NaN
+normend2 NaN
+#tiefile is not set.
+#series1gaps is not set.
+#series2gaps is not set.
+matchfile match.match
+#matrixfile is not set.
+logfile match.log
+#mean1 is not set.
+#mean2 is not set.
+#stddev1 is not set.
+#stddev2 is not set.
+series1 c5-inc-rs-of-sc c5-inc-rs-of-sc c5-rpi-rs-of-sc
+series2 Reference-rs-of-sc Reference-rs-of-sc Reference-rs-of-sc
+speeds 9:1 8:1 7:1 6:1 5:1 4:1 3:1 5:2 2:1 5:3 3:2 4:3 5:4 1:1 4:5 3:4 2:3 3:5 1:2 2:5 1:3 1:4 1:5 1:6 1:7 1:8 1:9
+targetspeed 1:1
+
+---Series Information---
+c5-inc-rs-of-sc: 600 data points.
+
+c5-inc-rs-of-sc: 600 data points.
+
+c5-rpi-rs-of-sc: 600 data points.
+
+Reference-rs-of-sc: 600 data points.
+
+Reference-rs-of-sc: 600 data points.
+
+Reference-rs-of-sc: 600 data points.
+
+
+---Score---
+Total: 2338.39
+
+---Penalties---
+      point:     1534.290
+    nomatch:      210.100
+      speed:        0.000
+speedchange:      594.000
+        tie:        0.000
+        gap:        0.000
+tie nomatch:        0.000
+-------------------------
+      Total:     2338.391
+Execution successful.

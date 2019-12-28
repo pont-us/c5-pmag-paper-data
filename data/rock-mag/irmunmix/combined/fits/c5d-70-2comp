@@ -1,0 +1,14 @@
+ True SIRM=    4045.96877051278     
+ 
+ Component            1
+ Abs Cont=    608.416025101760     
+ Rel Cont=   0.1503759     Mean=    1.547540     DP=   0.4975089    
+ 
+ Component            2
+ Abs Cont=    3437.55256454213     
+ Rel Cont=   0.8496241     Mean=    1.714927     DP=   0.3020993    
+ 
+ XLOGL=  -2.7204080E+07
+ IFAULT=            0
+ Iter=          105
+ 

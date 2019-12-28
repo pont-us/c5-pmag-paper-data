@@ -13,9 +13,9 @@ ref-data  | Data sets and models used for comparison and tuning
 script-output | Output from the data processing scripts
 scripts | Scripts to analyse and plot the data
 
-Publicly available third-party data is not included in this repository.
-Rather, it is automatically downloaded as required and cached in the
-ref-data directory.
+Some publicly available third-party data is not included in this
+repository. Rather, it is automatically downloaded as required and cached
+in the ref-data directory.
 
 To run the scripts in this repository, the following software (all
 freely available) must be installed.

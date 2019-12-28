@@ -10,7 +10,6 @@ import sys
 import re
 import os.path
 from matplotlib import pyplot
-import matplotlib
 from matplotlib.pyplot import Rectangle
 import argparse
 import codecs
@@ -100,26 +99,11 @@ def make_plot(language, xs, ys):
         coercivitymax=4
     )
 
-    settings.update(settings)
-    
-    
-    fontname = "NimbusSanL"
-    font = {"family": fontname,
-            "weight": "normal",
-            "size": 22}
-    matplotlib.rc("font", **font)
-    matplotlib.rcParams["mathtext.fontset"] = "custom"
-    matplotlib.rcParams["mathtext.it"] = fontname + ":italic"
-    matplotlib.rcParams["mathtext.rm"] = fontname
-    matplotlib.rcParams["mathtext.tt"] = fontname
-    matplotlib.rcParams["mathtext.bf"] = fontname
-    matplotlib.rcParams["mathtext.cal"] = fontname
-    matplotlib.rcParams["mathtext.sf"] = fontname
-
     colour_main = "#ffffff"
     colour_highlight = "#ffffff"
-    pyplot.xlabel("$B_{\mathrm{cr}} / B_\mathrm{c}$")
-    pyplot.ylabel("$M_{\mathrm{rs}} / M_{\mathrm{s}}$")
+    pyplot.gcf().set_size_inches(80 / 25.4, 58 / 25.4)
+    pyplot.xlabel(r"$B_{\mathrm{cr}} / B_\mathrm{c}$")
+    pyplot.ylabel(r"$M_{\mathrm{rs}} / M_{\mathrm{s}}$")
     pyplot.xlim(settings["xmin"], settings["xmax"])
     pyplot.ylim(settings["ymin"], settings["ymax"])
     pyplot.gca().add_patch(Rectangle((0, 0), settings["xmax"],
@@ -137,10 +121,10 @@ def make_plot(language, xs, ys):
     pyplot.hlines([settings["magmin"], settings["magmax"]], 0., 5.)
     pyplot.vlines([settings["coercivitymin"], settings["coercivitymax"]],
                   0.0, 0.6)
-    pyplot.subplots_adjust(left=0.12, bottom=0.14, right=0.97, top=0.97)
-    pyplot.plot(xs, ys, "o", color="none", mew=2., ms=12., mec="none",
-                mfc="black", alpha=0.5)
-    pyplot.savefig(os.path.join("..", "script-output", "day-plot.pdf"),
+    pyplot.subplots_adjust(left=0.15, bottom=0.18, right=0.97, top=0.96)
+    pyplot.plot(xs, ys, "o", color="none", mew=0.6, ms=4.0, mec="black",
+                mfc="none", alpha=0.6)
+    pyplot.savefig(os.path.join("..", "script-output", "fig-day-plot.pdf"),
                    transparent=True)
 
 

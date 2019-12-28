@@ -25,6 +25,7 @@ import sys
 from series import Series
 from simann import Annealer, AdaptiveSchedule
 from block import Bwarp, Bseries
+import plot
 from plot import WarpPlotter
 from match import MatchConf, MatchSeriesConf
 import logging
@@ -643,6 +644,9 @@ class Scoter(object):
 
 def main():
     # TODO configure logging to stdout
+
+    plot.set_font_properties()
+
     parser = argparse.ArgumentParser(description="Correlate geological records.")
     parser.add_argument("configuration", metavar="filename", type=str, nargs="?",
                    help="a Scoter configuration file")

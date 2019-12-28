@@ -1,9 +1,21 @@
 analyse.py             analyse generated C5 PSV and RPI data
 calc-dirs-and-rpi.py   generate C5 PSV and RPI data from magnetometer files
 clgplot.py             library for IRM CLG plotting (used by plot_irm)
+combined-maps.tex      combine large- and small-scale maps
+combine-psv-plots.py   combine PSV plots into a single PDF
 curveread.py           read PSV/RPI data from C5 and reference sources
-day_plot.py            create a Day plot from specified data
 day_plot_c5.py         create a Day plot from C5 data
+day_plot.py            create a Day plot from specified data
+demag-plots.tex	       produce composite figure from demagnetization plots
+makemap.sh             create complete, composite area map
+map-large-scale.png    bitmap portion of large-scale map
+map-large-scale.svg    large-scale map (includes map-large-scale.png)
+meaninc.py             calculate mean inclination (redundant)
+mm-params.py           create a Day plot (redundant)
+plot-core.py           create simple downcore PSV+RPI plot (redundant)
 plot_irm.py            create IRM CLG plots
 plot_settings.py       configure some matplotlib settings (used by plot_irm)
+simple-rpi.py          simplistic RPI calculation (redundant)
+test_curveread.py      unit tests for curveread.py
 tglc.py                library for reading/processing 2G magnetometer data
+topo-m.cpt             colour palette table for small-scale topo map

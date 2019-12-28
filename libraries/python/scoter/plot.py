@@ -26,9 +26,15 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.backends.backend_pdf import FigureCanvasPdf, PdfPages
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 
-font_props = FontProperties()
-font_props.set_size("x-small")
-font_props.set_family("Arial")
+
+font_props = None
+
+
+def set_font_properties():
+    global font_props
+    font_props = FontProperties()
+    font_props.set_size("x-small")
+    font_props.set_family("Arial")
 
 
 class WarpLine(object):
@@ -115,8 +121,9 @@ class Axes(object):
         if self.xlim[1] is not None: axes.set_xlim(right=self.xlim[1])
         if self.ylim[0] is not None: axes.set_ylim(bottom=self.ylim[0])
         if self.ylim[1] is not None: axes.set_ylim(top=self.ylim[1])
-        axes.legend(prop=font_props,
-                    loc=self.legend_loc, bbox_to_anchor=self.bbox_to_anchor)
+        if self.legend_loc is not None:
+            axes.legend(prop=font_props,
+                        loc=self.legend_loc, bbox_to_anchor=self.bbox_to_anchor)
 
         if self.customize is not None:
             self.customize(axes)
@@ -148,15 +155,15 @@ class Page(object):
                 for l in a.lines:
                     l.add_args(new_args, overwrite)
 
-    def plot(self, print_params={},
-             gridspec=dict(left=0.05, right=0.94, wspace=0.05),
-             figsize=(11, 8.5), filetype="pdf"):
+    def plot(self, gridspec=None, figsize=(11, 8.5), filetype="pdf"):
+        if gridspec is None:
+            gridspec = dict(left=0.05, right=0.94, wspace=0.05)
         nplots = len(self.plotspecs)
         fig = mpl.figure.Figure(figsize=figsize)
         if filetype.lower() == "pdf":
-            canvas = FigureCanvasPdf(fig)
+            FigureCanvasPdf(fig)
         elif filetype.lower() == "svg":
-            canvas = FigureCanvasSVG(fig)
+            FigureCanvasSVG(fig)
         else:
             raise ValueError("Unknown filetype: %s" % filetype)
         if self.title:
@@ -165,7 +172,9 @@ class Page(object):
         gs.update(**gridspec)
         for i in xrange(0, nplots):
             self.plotspecs[i].plot(fig, gs, i)
-        canvas.print_figure(self.filename, **print_params)
+        fig.set_size_inches(figsize)
+        fig.savefig(self.filename + "." + filetype,
+                    format=filetype.lower(), facecolor="none")
 
 
 def make_plot(seriess, filename, title=None, invert=False):

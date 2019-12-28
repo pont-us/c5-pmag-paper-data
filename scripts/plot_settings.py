@@ -1,10 +1,11 @@
 import matplotlib
 
+
 def set_matplotlib_parameters():
     fontname = "NimbusSanL"
     font = {"family": fontname,
             "weight": "normal",
-            "size": 22}
+            "size": 10}
     matplotlib.rc("font", **font)
     matplotlib.rcParams["mathtext.fontset"] = "custom"
     matplotlib.rcParams["mathtext.it"] = fontname + ":italic"
@@ -13,3 +14,7 @@ def set_matplotlib_parameters():
     matplotlib.rcParams["mathtext.bf"] = fontname
     matplotlib.rcParams["mathtext.cal"] = fontname
     matplotlib.rcParams["mathtext.sf"] = fontname
+    matplotlib.rcParams["legend.fontsize"] = 9
+
+
+PLOT_WIDTH = 180 / 25.4
