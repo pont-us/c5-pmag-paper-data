@@ -116,8 +116,10 @@ def print_sample_statistics(nrm_samples):
     print("Statistics for core")
     print_aralev([sample.getPcaValues().getDirection().getIncDeg()
                   for sample in nrm_samples])
-    print("\nStatistics for model")
-    print_aralev(read_model_inclinations())
+    print("\nStatistics for CALS10k.2")
+    print_aralev(read_model_inclinations_cals10k2())
+    print("\nStatistics for SHA.DIF.14k")
+    print_aralev(read_model_inclinations_shadif14k())
 
 
 def assemble_c5_sections():
@@ -210,24 +212,41 @@ def read_suite(filename, intensity_correction,
     return suite
 
 
-def _read_model_inclination_row(line):
+def _read_cals10k2_inclination_row(line):
     parts = re.split(" +", line.strip())
     age = 2010 - int(parts[0])
     return age, float(parts[1]), float(parts[2]), float(parts[3])
 
 
-def read_model_inclinations():
+def read_model_inclinations_cals10k2():
     """Read inclinations from model data.
     """
 
     with open("../ref-data/cals10k2/output-40_9735980556-13_7840316667") as fh:
         lines = fh.readlines()
 
-    rows = [_read_model_inclination_row(line) for line in lines[1:]]
+    rows = [_read_cals10k2_inclination_row(line) for line in lines[1:]]
 
     my_rows = [row for row in rows if 100 < row[0] < 4500]
     cols = zip(*my_rows)
     return cols[2]
+
+
+def read_model_inclinations_shadif14k():
+
+    with open("../ref-data/sha-dif-14k/output_40p973598_13p784032.dat") as fh:
+        lines = fh.readlines()
+
+    def read_row(line):
+        parts = re.split(" +", line.strip())
+        age = 1950 - int(float(parts[0]))
+        inc = float(parts[5])
+        return age, inc
+
+    rows = [read_row(line) for line in lines]
+    my_rows = [row for row in rows if 100 < row[0] < 4500]
+    cols = zip(*my_rows)
+    return cols[1]
 
 
 def print_aralev(inclinations):

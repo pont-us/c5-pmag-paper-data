@@ -242,6 +242,15 @@ class Dataset(object):
     def get_named_data(self, key):
         return self.extras[key]
 
+    def calculate_mad3_limits(self):
+        if "mad3" in self.extras:
+            if self.incs is not None:
+                self.extras["inc-min"] = self.incs - self.extras["mad3"]
+                self.extras["inc-max"] = self.incs + self.extras["mad3"]
+            if self.decs is not None:
+                self.extras["dec-min"] = self.decs - self.extras["mad3"]
+                self.extras["dec-max"] = self.decs + self.extras["mad3"]
+
 
 def ensure_dir_exists(dirname):
     try: 
@@ -733,6 +742,84 @@ def read_pfm9k_source(curve_name, location):
     return d
 
 
+def read_geomagia_italy_psv(name, location):
+    data_root = os.path.join(refdata_path("geomagia-italy"))
+    with open(os.path.join(data_root, "archeo013.csv"), "r") as fh:
+        lines = fh.readlines()
+
+    ages, decs, incs = [], [], []
+    for line in lines[2:]:
+        parts = line.split(",")
+        year = int(parts[0])
+        dec_at_site = float(parts[14])
+        inc_at_site = float(parts[15])
+        if dec_at_site == -999 or inc_at_site == -999:
+            continue
+        latitude = float(parts[23])
+        longitude = float(parts[24])
+        site_loc = Location(latitude, longitude)
+        decs_reloc, incs_reloc = \
+            site_loc.relocate_by_cvp(location, [dec_at_site], [inc_at_site])
+        ages.append(PRESENT_YEAR - year)
+        decs.append(decs_reloc)
+        incs.append(incs_reloc)
+
+    d = Dataset("Italy", ages, decs, incs)
+    d.flip()
+    return d
+
+
+def read_geomagia_italy_rpi(name, location):
+    data_root = os.path.join(refdata_path("geomagia-italy"))
+    with open(os.path.join(data_root, "archeo013.csv"), "r") as fh:
+        lines = fh.readlines()
+
+    ages, rpis = [], []
+    for line in lines[2:]:
+        parts = line.split(",")
+        year = int(parts[0])
+        rpi = float(parts[7])
+        if rpi != -999:
+            ages.append(PRESENT_YEAR - year)
+            rpis.append(rpi)
+
+    d = Dataset("Italy", ages, None, None, np.array(rpis))
+    d.flip()
+    return d
+
+
+def read_rio_martino(name, location):
+    rm_location = Location(44 + 42 / 60, 7 + 9 / 60)
+    data = np.genfromtxt(refdata_path("rio-martino", name + ".csv"),
+                         delimiter=",",
+                         skip_header=1)
+    age_kyr, decs_rm, incs_rm = data[:, 1], data[:, 2], data[:, 3]
+    decs, incs = rm_location.relocate_by_cvp(location, decs_rm, incs_rm)
+    return Dataset(name.upper(), age_kyr * 1000, decs, incs, None)
+
+
+def read_taranto_mp49_psv(name, location):
+    mp49_location = Location(39 + 50.07 / 60, 17 + 48.06 / 60)
+    data = np.genfromtxt(refdata_path("taranto-mp49", "psv.csv"),
+                         delimiter=",",
+                         skip_header=0)
+    year, site_decs, site_incs = data[:, 0], data[:, 1], data[:, 2]
+    decs, incs = mp49_location.relocate_by_cvp(location, site_decs, site_incs)
+    d = Dataset("MP49", PRESENT_YEAR - year, decs, incs, None)
+    d.flip()
+    return d
+
+
+def read_taranto_mp49_rpi(name, location):
+    data = np.genfromtxt(refdata_path("taranto-mp49", "vadm.csv"),
+                         delimiter=",",
+                         skip_header=0)
+    year, vadm = data[:, 0], data[:, 1]
+    d = Dataset("MP49", PRESENT_YEAR - year, None, None, vadm)
+    d.flip()
+    return d
+
+
 def read_w_europe(name, location):
 
     # Location (Paris) specified in the papers
@@ -842,7 +929,7 @@ def read_c5():
                                          "rpi-ms"])
 
     # NB median RPI created seperately
-
+    dataset.calculate_mad3_limits()
     return dataset
 
 
@@ -867,9 +954,8 @@ def create_c5_median_rpi(dataset):
     dataset.rpis = dataset.extras["rpi-median"]
 
 
-
 def read_c5_rpi_ms():
-    """ Read the RPI record of the C5 core as calculated by normalization
+    """Read the RPI record of the C5 core as calculated by normalization
     to magnetic susceptibility.
     """
     rpi_file = data_path("processed", "rpi-ms.csv")
@@ -900,7 +986,13 @@ dispatch_table = {
     "igrf_12": read_igrf12,
     "ty1": read_pfm9k_source,
     "ty2": read_pfm9k_source,
-    "w-europe": read_w_europe
+    "w-europe": read_w_europe,
+    "geomagia-italy-psv": read_geomagia_italy_psv,
+    "geomagia-italy-rpi": read_geomagia_italy_rpi,
+    "rmd1": read_rio_martino,
+    "rmd8": read_rio_martino,
+    "taranto-mp49-psv": read_taranto_mp49_psv,
+    "taranto-mp49-rpi": read_taranto_mp49_rpi,
 }
 
 
@@ -912,7 +1004,7 @@ def read_dataset(key, location, max_x=None):
     elif nargs == 2:
         dataset = fn(key, location)
     else:
-        raise ValueError("Invalid number of parameters for "+fn.func_name)
+        raise ValueError("Invalid number of parameters for " + fn.func_name)
     if max_x is not None:
         dataset.truncate(max_x)
     dataset.normalize()

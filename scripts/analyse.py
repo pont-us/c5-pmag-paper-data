@@ -29,6 +29,7 @@ from curveread import read_dataset, Location
 import logging
 import logging.config
 from plot_settings import set_matplotlib_parameters, PLOT_WIDTH
+import scipy
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,8 @@ class Constraints(object):
             tuple((cm + self.tiepoint_offset, self.present_year - year, margin,
                    desc, ref)
                   for (cm, year, margin, desc, ref) in self.ties_adbc)
-        self.ties = tuple((cm, age) for cm, age, _, _, _ in self.ties_with_margin)
+        self.ties = tuple((cm, age)
+                          for cm, age, _, _, _ in self.ties_with_margin)
 
 
 CONSTRAINTS = Constraints()
@@ -90,7 +92,9 @@ class Style(object):
         self.lineprops_target = dict(color="#0060ff", zorder=2.1, lw=0.75)
         self.lineprops_extras = dict(lw=0.5, zorder=0.5, ls="dashed",
                                      dashes=(2, 1))
-        self.colourlist = "black green orange blue grey purple red".split(" ")
+        self.lineprops_points = dict(zorder=0.5, ls="None", marker="o",
+                                     mfc="None", mew=0.2, ms=2)
+        self.colourlist = "black green orange blue grey purple red brown olive magenta".split(" ")
 
 
 STYLE = Style()
@@ -112,16 +116,22 @@ def standardize(s):
     return s.interpolate(600).subtract_mean().scale_std_to(1)
 
 
-def make_line_tuple(record, target, extras=None, lines_rec2=None):
+def make_line_tuple(record, target, extras=None, lines_rec2=None, points=None):
     if extras is None:
         extras = []
+    if points is None:
+        points = []
     lines_main = [Line(record, **STYLE.lineprops_record),
                   Line(target, **STYLE.lineprops_target)]
     lines_extra = [Line(extra, **STYLE.lineprops_extras)
                    for extra in extras]
     lines_rec2 = [Line(lines_rec2, **STYLE.lineprops_record2)] \
         if lines_rec2 else []
-    return tuple(lines_main + lines_rec2 + lines_extra)
+    lines_points = []
+    for i in range(len(points)):
+        lines_points.append(Line(points[i], mec=STYLE.colourlist[i + 1],
+                                 **STYLE.lineprops_points))
+    return tuple(lines_main + lines_rec2 + lines_extra + lines_points)
 
 
 def mark_levantine_spike(axes):
@@ -134,36 +144,90 @@ def mark_levantine_spike(axes):
 
 def linear_age_model(dec_target, inc_target, rpi_target,
                      dec_record, inc_record, rpi_record,
-                     dec_extras=(), inc_extras=(), rpi_extras=()):
-    transformed_inc = inc_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)).linear_position_transform(CONSTRAINTS.ties)
+                     dec_extras=(), inc_extras=(), rpi_extras=(),
+                     dec_points=(), inc_points=(), rpi_points=(),
+                     mad3s=None):
+    transformed_inc = \
+        inc_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)). \
+        linear_position_transform(CONSTRAINTS.ties).smooth(5)
     transformed_inc.name = "C5 core"
-    transformed_rpi = rpi_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)).linear_position_transform(CONSTRAINTS.ties)
+    transformed_rpi = \
+        rpi_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)). \
+        linear_position_transform(CONSTRAINTS.ties).smooth(5)
     transformed_rpi.name = "C5 core"
-    transformed_dec = dec_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)).linear_position_transform(CONSTRAINTS.ties). \
-        wrap_values()
+    transformed_dec = \
+        dec_record.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest)). \
+        linear_position_transform(CONSTRAINTS.ties). \
+        wrap_values().smooth(5)
     transformed_dec.name = "C5 core"
+    mad3s_clipped = mad3s.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest))
+
+    def mean_abs_difference(series1, series2):
+        return np.mean(np.abs(series1.interpolate(500).values() -
+                              series2.interpolate(500).values()))
+
+    print("dec difference: {:.2f}".format(mean_abs_difference(transformed_dec, dec_target)))
+    print("inc difference: {:.2f}".format(mean_abs_difference(transformed_inc, inc_target)))
+    print("RPI difference: {:.2f}".format(mean_abs_difference(transformed_rpi, rpi_target)))
+
+    incs_for_comparison_record = transformed_inc.interpolate(400)
+    incs_for_comparison_target = inc_target.interpolate(400)
+    print(np.mean(np.abs(incs_for_comparison_record.values() - incs_for_comparison_target.values())))
 
     tie_dates = [t[1] for t in CONSTRAINTS.ties]
     line_opts = dict(lw=1.0)
     axes_opts = dict(xlim=(0, CONSTRAINTS.oldest),
                      vlines=tie_dates,)
 
+    np.savetxt(outpath("decs-linear.csv"), np.transpose(transformed_dec.data),
+               delimiter=",")
+    np.savetxt(outpath("incs-linear.csv"), np.transpose(transformed_inc.data),
+               delimiter=",")
+    np.savetxt(outpath("rpis-linear.csv"), np.transpose(transformed_rpi.data),
+               delimiter=",")
+
+    for record_depth, record_age in [(inc_record, transformed_inc),
+                                     (dec_record, transformed_dec),
+                                     (rpi_record, transformed_rpi)]:
+        record_clipped = record_depth.clip((CONSTRAINTS.shallowest, CONSTRAINTS.deepest))
+        for i in range(record_clipped.npoints()):
+            depth = record_clipped.data[0, i]
+            if 230 < depth < 250:
+                record_age.data[1, i] = np.nan
+
+    def add_mad3_area_inc(ax):
+        ax.fill_between(transformed_inc.positions(), transformed_inc.values() - mad3s_clipped.values(),
+                        transformed_inc.values() + mad3s_clipped.values(), facecolor="#c0c0c0",
+                        zorder=0, color="None")
+
+    def add_mad3_area_dec(ax):
+        ax.fill_between(transformed_dec.positions(),
+                        map(wrap_declination, transformed_dec.values() - mad3s_clipped.values()),
+                        map(wrap_declination, transformed_dec.values() + mad3s_clipped.values()),
+                        facecolor="#c0c0c0",
+                        zorder=0, color="None")
+
     page = \
         Page((
               Plot(Axes(make_line_tuple(transformed_inc,
-                                        inc_target, extras=inc_extras),
+                                        inc_target, extras=inc_extras,
+                                        points=inc_points),
                         legend_loc="center left",
                         bbox_to_anchor=(1.002, 0.5),
                         ylabel=u"inclination (°)",
+                        customize=add_mad3_area_inc,
                         **axes_opts)),
               Plot(Axes(make_line_tuple(transformed_dec,
-                                        dec_target, extras=dec_extras),
+                                        dec_target, extras=dec_extras,
+                                        points=dec_points),
                         legend_loc="center left",
                         bbox_to_anchor=(1.002, 0.5),
                         ylabel=u"declination (°)",
+                        customize=add_mad3_area_dec,
                         **axes_opts)),
               Plot(Axes(make_line_tuple(transformed_rpi,
-                                        rpi_target, extras=rpi_extras),
+                                        rpi_target, extras=rpi_extras,
+                                        points=rpi_points),
                         legend_loc="center left",
                         bbox_to_anchor=(1.002, 0.5),
                         ylabel="RPI (normalized)",
@@ -178,9 +242,6 @@ def linear_age_model(dec_target, inc_target, rpi_target,
     page.plot(gridspec=dict(bottom=0.07, top=0.98, hspace=0.13,
                             left=0.08, right=0.90, wspace=0.01),
               filetype="pdf", figsize=(PLOT_WIDTH, PLOT_WIDTH * 0.81))
-    np.savetxt(outpath("decs-linear.csv"), np.transpose(transformed_dec.data), delimiter=",")
-    np.savetxt(outpath("incs-linear.csv"), np.transpose(transformed_inc.data), delimiter=",")
-    np.savetxt(outpath("rpis-linear.csv"), np.transpose(transformed_rpi.data), delimiter=",")
 
     return transformed_dec, transformed_inc, transformed_rpi
 
@@ -326,28 +387,40 @@ def do_match(dec_target, inc_target, rpi_target,
         line_opts = dict(lw=1.0)
         axes_opts = dict(xlim=(0, CONSTRAINTS.oldest),
                          vlines=tie_dates,)
+
+        erase_from = 166
+        erase_to = 185
+        warped_inc = warped["inc"]["tan"].smooth(5)
+        warped_inc.data[1, erase_from:erase_to] = np.nan
+        warped_dec = warped["dec"]["tan"].smooth(5)
+        warped_dec.data[1, erase_from:erase_to] = np.nan
+        warped_rpi = warped["rpi"]["tan"].smooth(5)
+        warped_rpi.data[1, erase_from:erase_to] = np.nan
+        sed_rate = rates["tan"].scale_values_without_offset(10)
+        sed_rate.data[1, 52:63] = np.nan
+
         tandem_page = \
             Page((
-                  Plot(Axes(make_line_tuple(warped["inc"]["tan"],
+                  Plot(Axes(make_line_tuple(warped_inc,
                                             inc_target, lines_rec2=inc_linear),
                             legend_loc="center left",
                             bbox_to_anchor=(1.002, 0.5),
                             ylabel=u"inclination (°)",
                             **axes_opts)),
-                  Plot(Axes(make_line_tuple(warped["dec"]["tan"],
+                  Plot(Axes(make_line_tuple(warped_dec,
                                             dec_target, lines_rec2=dec_linear),
                             legend_loc="center left",
                             bbox_to_anchor=(1.002, 0.5),
                             ylabel=u"declination (°)",
                             **axes_opts)),
-                  Plot(Axes(make_line_tuple(warped["rpi"]["tan"],
+                  Plot(Axes(make_line_tuple(warped_rpi,
                                             rpi_target, lines_rec2=rpi_linear),
                             legend_loc="center left",
                             bbox_to_anchor=(1.002, 0.5),
                             ylabel="RPI (normalized)",
                             customize=mark_levantine_spike,
                             **axes_opts)),
-                  Plot(Axes((Line(rates["tan"].scale_values_without_offset(10),
+                  Plot(Axes((Line(sed_rate,
                                   color="black"),),
                             legend_loc=None,
                             ylabel="sed. rate (mm/yr)",
@@ -375,19 +448,19 @@ def do_match(dec_target, inc_target, rpi_target,
         inc_page.add_line_args(line_opts)
 
 
-def comparison_plot(age_datasets, depth_datasets, parameter,
-                    ylims=None):
+def wrap_declination(dec):
+    return dec if dec < 300 else dec - 360
 
+
+def comparison_plot(age_datasets, depth_datasets, parameter,
+                    ylims=None, plot_as_points_from=999):
     axes = []
     ylabels = {"decs": u"Declination (°)",
                "incs": u"Inclination (°)",
                "rpis": "RPI (normalized)"}
 
-    def wrap_declination(dec):
-        return dec if dec < 300 else dec - 360
-
     for plot_index, datasets in enumerate((age_datasets, depth_datasets)):
-        axis1 = plt.subplot(2, 1, plot_index+1)
+        axis1 = plt.subplot(2, 1, plot_index + 1)
         axes.append(axis1)
         if plot_index == 0:
             axis1.xaxis.tick_top()
@@ -407,13 +480,24 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
             ys = getattr(dataset, parameter)
             if parameter == "decs":
                 ys = map(wrap_declination, ys)
-            line = axis1.plot(dataset.xs, ys,
-                              color=STYLE.colourlist[dataset_index],
-                              lw=1,
-                              mec=STYLE.colourlist[dataset_index],
-                              mfc=STYLE.colourlist[dataset_index],
-                              markersize=1,
-                              label=label)
+            if dataset_index < plot_as_points_from:
+                line = axis1.plot(dataset.xs, ys,
+                                  color=STYLE.colourlist[dataset_index],
+                                  lw=1,
+                                  mec=STYLE.colourlist[dataset_index],
+                                  mfc=STYLE.colourlist[dataset_index],
+                                  markersize=1,
+                                  label=label)
+            else:
+                line = axis1.plot(dataset.xs, ys,
+                                  linestyle="None",
+                                  marker="o",
+                                  mec=STYLE.colourlist[dataset_index],
+                                  mfc="None",
+                                  mew=0.3,
+                                  markersize=3,
+                                  label=label)
+
             if (parameter in ("incs", "decs") and plot_index == 1 and
                dataset.has_named_data("mad3")):
                 axis2 = axis1.twinx()
@@ -422,6 +506,20 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
                 axis2.plot(dataset.xs, dataset.get_named_data("mad3"),
                            color="#009060", lw=0.5)
                 axis2.yaxis.set_label_text(u"MAD (°)")
+                if parameter == "incs":
+                    axis1.fill_between(dataset.xs,
+                                       dataset.get_named_data("inc-min"),
+                                       dataset.get_named_data("inc-max"),
+                                       facecolor="#b0b0b0",
+                                       color="None")
+                if parameter == "decs":
+                    axis1.fill_between(dataset.xs,
+                                       map(wrap_declination,
+                                           dataset.get_named_data("dec-min")),
+                                       map(wrap_declination,
+                                           dataset.get_named_data("dec-max")),
+                                       facecolor="#b0b0b0",
+                                       color="None")
 
             if parameter == "rpis" and plot_index == 1:
                 axis1.plot(dataset.xs, dataset.get_named_data("rpi-arm-ratio"),
@@ -459,14 +557,14 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
             axis1.annotate("MAD", xy=(90, 32), color="#009060")
 
         if parameter == "decs" and plot_index == 1:
-            axis1.annotate("declination", xy=(165, 32), color="black")
+            axis1.annotate("declination", xy=(120, 12), color="black")
             axis1.annotate("MAD", xy=(165, -25), color="#009060")
 
     axes[0].set_xlim((0, CONSTRAINTS.oldest))
 
-    if ylims:
-        axes[0].set_ylim(ylims)
-        axes[1].set_ylim(ylims)
+    if ylims is not None:
+        axes[0].set_ylim(ylims[0])
+        axes[1].set_ylim(ylims[1])
 
     for core_boundary in (52, 152, 252, 352):
         axes[1].axvline(core_boundary,
@@ -568,6 +666,17 @@ def measure_distances(c5):
         print("%15s %.2f " % (loc, c5.distance_km(other_locs[loc])))
 
 
+def depth_to_age_linear(tie_points, depths):
+    tie_points_flipped = zip(*tie_points)
+    transform_xs = tie_points_flipped[0]
+    transform_ys = tie_points_flipped[1]
+
+    f = scipy.interpolate.interp1d(transform_xs, transform_ys,
+                                   fill_value="extrapolate")
+    ages = f(np.array(depths))
+    return ages
+
+
 def main():
 
     root = logging.getLogger()
@@ -585,7 +694,8 @@ def main():
     keys = ("cals10k2", "cals3k4", "sha-dif-14k", "uk",
             "c5", "augusta", "igrf_12", "ty1", "ty2",
             "salerno_decs", "salerno_incs", "salerno_rpis",
-            "w-europe")
+            "w-europe", "geomagia-italy-psv", "geomagia-italy-rpi",
+            "rmd1", "rmd8", "taranto-mp49-psv", "taranto-mp49-rpi")
     data = {key: read_dataset(key, c5_loc, 4500) for key in keys}
 
     c5 = data["c5"]
@@ -600,15 +710,18 @@ def main():
 
     # Plot comparisons between C5 and reference data
     comparison_plot(data_list("augusta salerno_decs sha-dif-14k ty1 ty2 "
-                              "w-europe"),
+                              "w-europe geomagia-italy-psv taranto-mp49-psv "
+                              "rmd1 rmd8"),
                     (c5, ), "decs",
-                    (-30, 60))
+                    ((-30, 60), (-32, 32)), 6)
     comparison_plot(data_list("augusta salerno_incs sha-dif-14k ty1 ty2 "
-                              "w-europe"),
+                              "w-europe geomagia-italy-psv taranto-mp49-psv "
+                              "rmd1 rmd8"),
                     (c5, ), "incs",
-                    (30, 85))
-    comparison_plot(data_list("augusta salerno_rpis sha-dif-14k cals10k2"),
-                    (c5, ), "rpis", None)
+                    ((30, 85), (30, 80)), 6)
+    comparison_plot(data_list("augusta salerno_rpis sha-dif-14k cals10k2 "
+                              "geomagia-italy-rpi taranto-mp49-rpi"),
+                    (c5, ), "rpis", None, 4)
 
     def incseries(name):
         return data[name].inc_series(name)
@@ -637,14 +750,6 @@ def main():
     dec_comp_2 = create_combination_specifiers(decseries)
     rpi_comp_2 = create_combination_specifiers(rpiseries)
 
-    inc_extras = (
-        data["salerno_incs"].inc_series("Salerno"),
-        data["sha-dif-14k"].inc_series("SHA.DIF.14k"),
-        data["ty1"].inc_series("ET91-18"),
-        data["ty2"].inc_series("ET95-4"),
-        data["w-europe"].inc_series("W. Europe"),
-    )
-
     dec_extras = (
         data["salerno_decs"].dec_series("Salerno"),
         data["sha-dif-14k"].dec_series("SHA.DIF.14k"),
@@ -653,10 +758,37 @@ def main():
         data["w-europe"].dec_series("W. Europe"),
     )
 
+    dec_points = (
+        data["geomagia-italy-psv"].dec_series("Italy"),
+        data["taranto-mp49-psv"].dec_series("MP49"),
+        data["rmd1"].dec_series("RMD1"),
+        data["rmd8"].dec_series("RMD8"),
+    )
+
+    inc_extras = (
+        data["salerno_incs"].inc_series("Salerno"),
+        data["sha-dif-14k"].inc_series("SHA.DIF.14k"),
+        data["ty1"].inc_series("ET91-18"),
+        data["ty2"].inc_series("ET95-4"),
+        data["w-europe"].inc_series("W. Europe"),
+    )
+
+    inc_points = (
+        data["geomagia-italy-psv"].inc_series("Italy"),
+        data["taranto-mp49-psv"].inc_series("MP49"),
+        data["rmd1"].inc_series("RMD1"),
+        data["rmd8"].inc_series("RMD8"),
+    )
+
     rpi_extras = (
         data["salerno_rpis"].rpi_series("Salerno"),
         data["sha-dif-14k"].rpi_series("SHA.DIF.14k"),
         data["cals10k2"].rpi_series("CALS10k.2"),
+    )
+
+    rpi_points = (
+        data["geomagia-italy-rpi"].rpi_series("Italy"),
+        data["taranto-mp49-rpi"].rpi_series("MP49")
     )
 
     inc_comp_2.name = "Reference"
@@ -671,7 +803,9 @@ def main():
                          c5.dec_series("c5-dec"),
                          c5.inc_series("c5-inc"),
                          c5.rpi_series("c5-rpi"),
-                         dec_extras, inc_extras, rpi_extras)
+                         dec_extras, inc_extras, rpi_extras,
+                         dec_points, inc_points, rpi_points,
+                         c5.get_series("mad3", "mad3"))
 
     linear_dec.name = "C5 linear"
     linear_inc.name = "C5 linear"
@@ -684,6 +818,9 @@ def main():
              linear_dec,  linear_inc, linear_rpi)
 
     measure_distances(c5_loc)
+
+    print(depth_to_age_linear(CONSTRAINTS.ties, [48, 97, 147, 230, 329, 384]))
+    print(depth_to_age_linear(CONSTRAINTS.ties, [230, 250]))
 
 
 if __name__ == "__main__":
