@@ -744,7 +744,7 @@ def read_pfm9k_source(curve_name, location):
 
 def read_geomagia_italy_psv(name, location):
     data_root = os.path.join(refdata_path("geomagia-italy"))
-    with open(os.path.join(data_root, "archeo013.csv"), "r") as fh:
+    with open(os.path.join(data_root, name[:-4] + ".csv"), "r") as fh:
         lines = fh.readlines()
 
     ages, decs, incs = [], [], []
@@ -764,14 +764,14 @@ def read_geomagia_italy_psv(name, location):
         decs.append(decs_reloc)
         incs.append(incs_reloc)
 
-    d = Dataset("Italy", ages, decs, incs)
+    d = Dataset(name, ages, decs, incs)
     d.flip()
     return d
 
 
 def read_geomagia_italy_rpi(name, location):
     data_root = os.path.join(refdata_path("geomagia-italy"))
-    with open(os.path.join(data_root, "archeo013.csv"), "r") as fh:
+    with open(os.path.join(data_root, name[:-4] + ".csv"), "r") as fh:
         lines = fh.readlines()
 
     ages, rpis = [], []
@@ -783,7 +783,7 @@ def read_geomagia_italy_rpi(name, location):
             ages.append(PRESENT_YEAR - year)
             rpis.append(rpi)
 
-    d = Dataset("Italy", ages, None, None, np.array(rpis))
+    d = Dataset(name, ages, None, None, np.array(rpis))
     d.flip()
     return d
 
@@ -987,8 +987,10 @@ dispatch_table = {
     "ty1": read_pfm9k_source,
     "ty2": read_pfm9k_source,
     "w-europe": read_w_europe,
-    "geomagia-italy-psv": read_geomagia_italy_psv,
-    "geomagia-italy-rpi": read_geomagia_italy_rpi,
+    "geomagia-arch-psv": read_geomagia_italy_psv,
+    "geomagia-arch-rpi": read_geomagia_italy_rpi,
+    "geomagia-volc-psv": read_geomagia_italy_psv,
+    "geomagia-volc-rpi": read_geomagia_italy_rpi,
     "rmd1": read_rio_martino,
     "rmd8": read_rio_martino,
     "taranto-mp49-psv": read_taranto_mp49_psv,

@@ -93,8 +93,8 @@ class Style(object):
         self.lineprops_extras = dict(lw=0.5, zorder=0.5, ls="dashed",
                                      dashes=(2, 1))
         self.lineprops_points = dict(zorder=0.5, ls="None", marker="o",
-                                     mfc="None", mew=0.2, ms=2)
-        self.colourlist = "black green orange blue grey purple red brown olive magenta".split(" ")
+                                     mfc="None", mew=0.15, ms=1.5)
+        self.colourlist = "black green orange blue grey purple red brown olive magenta pink".split(" ")
 
 
 STYLE = Style()
@@ -360,7 +360,7 @@ def do_match(dec_target, inc_target, rpi_target,
                         desc, cite, float(warped_age), offset_math
                     ))
                     index += 1
-        
+
         # Create warped data sets -- every combination of:
         # warpees (smoothed input data to be warped): inc, rpi
         # warpers (match results to use for warping): inc, rpi, tan
@@ -459,6 +459,24 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
                "incs": u"Inclination (°)",
                "rpis": "RPI (normalized)"}
 
+    label_map = {
+        "C5 core": "C5 core",
+        "Augusta": "Augusta\n(Sagnotti et al., 2011)",
+        "Salerno": "Salerno\n(Iorio et al., 2009)",
+        "SHA.DIF.14k": u"SHA.DIF.14k\n(Pavón-Carrasco et al., 2014)",
+        "ET91-18": "ET91-18 (Vigliotti, 2006)",
+        "ET95-4": "ET95-4 (Vigliotti, 2006)",
+        "W. Europe": "W. Europe\n(Gallet et al., 2002)",
+        "geomagia-arch-psv": "Italy archaeomagnetic\n(Brown et al., 2015)",
+        "geomagia-volc-psv": "Italy volcanic\n(Brown et al., 2015)",
+        "geomagia-arch-rpi": "Italy archaeomagnetic\n(Brown et al., 2015)",
+        "geomagia-volc-rpi": "Italy volcanic\n(Brown et al., 2015)",
+        "MP49": u"MP49 (Béguin et al., 2019)",
+        "RMD1": "RMD1 (Zanella et al., 2018)",
+        "RMD8": "RMD8 (Zanella et al., 2018)",
+        "CALS10k.2": "CALS10k.2\n(Constable et al., 2016)"
+    }
+
     for plot_index, datasets in enumerate((age_datasets, depth_datasets)):
         axis1 = plt.subplot(2, 1, plot_index + 1)
         axes.append(axis1)
@@ -474,7 +492,7 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
             ("C5 " if plot_index == 1 else "") + ylabels[parameter])
         axis1.patch.set_facecolor("white")
         for dataset_index, dataset in enumerate(datasets):
-            label = dataset.name
+            label = label_map[dataset.name]
             if parameter == "rpis" and plot_index == 1:
                 label = "MS"
             ys = getattr(dataset, parameter)
@@ -494,9 +512,10 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
                                   marker="o",
                                   mec=STYLE.colourlist[dataset_index],
                                   mfc="None",
-                                  mew=0.3,
-                                  markersize=3,
-                                  label=label)
+                                  mew=0.2,
+                                  markersize=2,
+                                  label=label,
+                                  zorder=0.5)
 
             if (parameter in ("incs", "decs") and plot_index == 1 and
                dataset.has_named_data("mad3")):
@@ -601,7 +620,7 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
     if parameter == "rpis":
 
         legend0 = axes[0].legend(ncol=1, handletextpad=0.1,
-                                 columnspacing=0.5, fontsize="small",
+                                 columnspacing=0.5, fontsize=5,
                                  frameon=True,
                                  loc="center left",
                                  bbox_to_anchor=(1.002, 0.5)
@@ -612,7 +631,7 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
         frame.set_zorder(11)
 
         legend1 = axes[1].legend(loc=(0.02, 0.35), ncol=2, handletextpad=0.0,
-                                 columnspacing=0.2, fontsize="small",
+                                 columnspacing=0.2, fontsize=5,
                                  frameon=True)
         frame = legend1.get_frame()
         frame.set_facecolor("white")
@@ -621,14 +640,14 @@ def comparison_plot(age_datasets, depth_datasets, parameter,
 
     if parameter == "incs":
         axes[0].legend(ncol=1, handletextpad=0.1,
-                       columnspacing=0.5, fontsize="small",
+                       columnspacing=0.5, fontsize=5,
                        loc="center left",
                        bbox_to_anchor=(1.002, 0.5)
                        )
 
     if parameter == "decs":
         axes[0].legend(ncol=1, handletextpad=0.1,
-                       columnspacing=0.5, fontsize="small",
+                       columnspacing=0.5, fontsize=5,
                        loc="center left",
                        bbox_to_anchor=(1.002, 0.5)
                        )
@@ -690,11 +709,13 @@ def main():
     c5_loc = Location(40. + 58./60. + 24.953/3600.,
                       13. + 47./60. + 02.514/3600.)
 
-    # Read the reference data    
+    # Read the reference data
     keys = ("cals10k2", "cals3k4", "sha-dif-14k", "uk",
             "c5", "augusta", "igrf_12", "ty1", "ty2",
             "salerno_decs", "salerno_incs", "salerno_rpis",
-            "w-europe", "geomagia-italy-psv", "geomagia-italy-rpi",
+            "w-europe",
+            "geomagia-arch-psv", "geomagia-arch-rpi",
+            "geomagia-volc-psv", "geomagia-volc-rpi",
             "rmd1", "rmd8", "taranto-mp49-psv", "taranto-mp49-rpi")
     data = {key: read_dataset(key, c5_loc, 4500) for key in keys}
 
@@ -710,17 +731,20 @@ def main():
 
     # Plot comparisons between C5 and reference data
     comparison_plot(data_list("augusta salerno_decs sha-dif-14k ty1 ty2 "
-                              "w-europe geomagia-italy-psv taranto-mp49-psv "
+                              "w-europe geomagia-arch-psv geomagia-volc-psv "
+                              "taranto-mp49-psv "
                               "rmd1 rmd8"),
                     (c5, ), "decs",
                     ((-30, 60), (-32, 32)), 6)
     comparison_plot(data_list("augusta salerno_incs sha-dif-14k ty1 ty2 "
-                              "w-europe geomagia-italy-psv taranto-mp49-psv "
+                              "w-europe geomagia-arch-psv geomagia-volc-psv "
+                              "taranto-mp49-psv "
                               "rmd1 rmd8"),
                     (c5, ), "incs",
                     ((30, 85), (30, 80)), 6)
     comparison_plot(data_list("augusta salerno_rpis sha-dif-14k cals10k2 "
-                              "geomagia-italy-rpi taranto-mp49-rpi"),
+                              "geomagia-arch-rpi geomagia-volc-rpi "
+                              "taranto-mp49-rpi"),
                     (c5, ), "rpis", None, 4)
 
     def incseries(name):
@@ -751,55 +775,58 @@ def main():
     rpi_comp_2 = create_combination_specifiers(rpiseries)
 
     dec_extras = (
-        data["salerno_decs"].dec_series("Salerno"),
-        data["sha-dif-14k"].dec_series("SHA.DIF.14k"),
-        data["ty1"].dec_series("ET91-18"),
-        data["ty2"].dec_series("ET95-4"),
-        data["w-europe"].dec_series("W. Europe"),
+        data["salerno_decs"].dec_series("Salerno\n(Iorio et al., 2009)"),
+        data["sha-dif-14k"].dec_series(u"SHA.DIF.14k\n(Pavón-Carrasco et al., 2014)"),
+        data["ty1"].dec_series("ET91-18 (Vigliotti, 2006)"),
+        data["ty2"].dec_series("ET95-4 (Vigliotti, 2006)"),
+        data["w-europe"].dec_series("W. Europe\n(Gallet et al., 2002)"),
     )
 
     dec_points = (
-        data["geomagia-italy-psv"].dec_series("Italy"),
-        data["taranto-mp49-psv"].dec_series("MP49"),
-        data["rmd1"].dec_series("RMD1"),
-        data["rmd8"].dec_series("RMD8"),
+        data["geomagia-arch-psv"].dec_series("Italy archaeomagnetic\n(Brown et al., 2015)"),
+        data["geomagia-volc-psv"].dec_series("Italy volcanic\n(Brown et al., 2015)"),
+        data["taranto-mp49-psv"].dec_series(u"MP49 (Béguin et al., 2019)"),
+        data["rmd1"].dec_series("RMD1 (Zanella et al., 2018)"),
+        data["rmd8"].dec_series("RMD8 (Zanella et al., 2018)"),
     )
 
     inc_extras = (
-        data["salerno_incs"].inc_series("Salerno"),
-        data["sha-dif-14k"].inc_series("SHA.DIF.14k"),
-        data["ty1"].inc_series("ET91-18"),
-        data["ty2"].inc_series("ET95-4"),
-        data["w-europe"].inc_series("W. Europe"),
+        data["salerno_incs"].inc_series("Salerno\n(Iorio et al., 2009)"),
+        data["sha-dif-14k"].inc_series(u"SHA.DIF.14k\n(Pavón-Carrasco et al., 2014)"),
+        data["ty1"].inc_series("ET91-18 (Vigliotti, 2006)"),
+        data["ty2"].inc_series("ET95-4 (Vigliotti, 2006)"),
+        data["w-europe"].inc_series("W. Europe\n(Gallet et al., 2002)"),
     )
 
     inc_points = (
-        data["geomagia-italy-psv"].inc_series("Italy"),
-        data["taranto-mp49-psv"].inc_series("MP49"),
-        data["rmd1"].inc_series("RMD1"),
-        data["rmd8"].inc_series("RMD8"),
+        data["geomagia-arch-psv"].inc_series("Italy archaeomagnetic\n(Brown et al., 2015)"),
+        data["geomagia-volc-psv"].inc_series("Italy volcanic\n(Brown et al., 2015)"),
+        data["taranto-mp49-psv"].inc_series(u"MP49 (Béguin et al., 2019)"),
+        data["rmd1"].inc_series("RMD1 (Zanella et al., 2018)"),
+        data["rmd8"].inc_series("RMD8 (Zanella et al., 2018)"),
     )
 
     rpi_extras = (
-        data["salerno_rpis"].rpi_series("Salerno"),
-        data["sha-dif-14k"].rpi_series("SHA.DIF.14k"),
-        data["cals10k2"].rpi_series("CALS10k.2"),
+        data["salerno_rpis"].rpi_series("Salerno\n(Iorio et al., 2009)"),
+        data["sha-dif-14k"].rpi_series(u"SHA.DIF.14k\n(Pavón-Carrasco et al., 2014)"),
+        data["cals10k2"].rpi_series("CALS10k.2\n(Constable et al., 2016)"),
     )
 
     rpi_points = (
-        data["geomagia-italy-rpi"].rpi_series("Italy"),
-        data["taranto-mp49-rpi"].rpi_series("MP49")
+        data["geomagia-arch-rpi"].rpi_series("Italy archaeomagnetic\n(Brown et al., 2015)"),
+        data["geomagia-volc-rpi"].rpi_series("Italy volcanic\n(Brown et al., 2015)"),
+        data["taranto-mp49-rpi"].rpi_series(u"MP49 (Béguin et al., 2019)")
     )
 
     inc_comp_2.name = "Reference"
     dec_comp_2.name = "Reference"
     rpi_comp_2.name = "Reference"
-    
+
     # Create linear age model and plot results
     linear_dec, linear_inc, linear_rpi = \
-        linear_age_model(data["augusta"].dec_series("Augusta"),
-                         data["augusta"].inc_series("Augusta"),
-                         data["augusta"].rpi_series("Augusta"),
+        linear_age_model(data["augusta"].dec_series("Augusta\n(Sagnotti et al., 2011)"),
+                         data["augusta"].inc_series("Augusta\n(Sagnotti et al., 2011)"),
+                         data["augusta"].rpi_series("Augusta\n(Sagnotti et al., 2011)"),
                          c5.dec_series("c5-dec"),
                          c5.inc_series("c5-inc"),
                          c5.rpi_series("c5-rpi"),

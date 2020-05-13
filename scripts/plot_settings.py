@@ -14,9 +14,9 @@ def set_matplotlib_parameters():
     matplotlib.rcParams["mathtext.bf"] = fontname
     matplotlib.rcParams["mathtext.cal"] = fontname
     matplotlib.rcParams["mathtext.sf"] = fontname
-    matplotlib.rcParams["legend.fontsize"] = 7
+    matplotlib.rcParams["legend.fontsize"] = 5
     matplotlib.rcParams["legend.numpoints"] = 1
-    matplotlib.rcParams["legend.labelspacing"] = 0.1
+    matplotlib.rcParams["legend.labelspacing"] = 0.3
 
 
 PLOT_WIDTH = 180 / 25.4

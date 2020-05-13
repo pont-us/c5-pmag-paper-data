@@ -63,7 +63,7 @@ def do_c5_calculations():
 def do_sample_calculations(nrm_suite):
     # Perform a PCA calculation for each sample.
     for sample in nrm_suite.getSamples():
-        sample.selectByTreatmentLevelRange(0.014999, 0.10001)
+        sample.selectByTreatmentLevelRange(0.014999, 0.079999)
 
         # Exclude the 30 mT from C5D due to a flux jump
         data = sample.getTreatmentSteps()

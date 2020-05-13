@@ -40,10 +40,10 @@ Reference-rs-of-sc: 600 data points.
 
 
 ---Score---
-Total: 1826.4
+Total: 1822.92
 
 ---Penalties---
-      point:     1126.398
+      point:     1122.920
     nomatch:        0.001
       speed:        0.000
 speedchange:      700.000
@@ -51,5 +51,5 @@ speedchange:      700.000
         gap:        0.000
 tie nomatch:        0.000
 -------------------------
-      Total:     1826.399
+      Total:     1822.921
 Execution successful.

@@ -52,10 +52,10 @@ Tiepoints:
 430 4420
 
 ---Score---
-Total: 142699
+Total: 142687
 
 ---Penalties---
-      point:     1570.888
+      point:     1558.744
     nomatch:     2213.017
       speed:        0.000
 speedchange:    52200.000
@@ -63,5 +63,5 @@ speedchange:    52200.000
         gap:        0.000
 tie nomatch:        0.000
 -------------------------
-      Total:   142666.891
+      Total:   142654.766
 Execution successful.
